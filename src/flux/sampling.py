@@ -1,5 +1,5 @@
 import math
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 import torch
 from einops import rearrange, repeat
@@ -95,7 +95,7 @@ def get_schedule(
 
 def denoise_lucidflux(
     model: Flux,
-    dual_condition_model:None,
+    dual_condition_model: None,
     # model input
     img: Tensor,
     img_ids: Tensor,
@@ -108,6 +108,8 @@ def denoise_lucidflux(
     guidance: float = 4.0,
     condition_cond_lq=None,
     condition_cond_pre=None,
+    image_proj: Optional[Tensor] = None,
+    ip_scale: float = 0.0,
 ):
     # this is ignored for schnell
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
@@ -121,6 +123,10 @@ def denoise_lucidflux(
         vec_in = vec.to(dtype)
         cond_lq = condition_cond_lq.to(dtype)
         cond_pre = condition_cond_pre.to(dtype)
+
+        image_proj_in = None
+        if image_proj is not None:
+            image_proj_in = image_proj.to(device=img.device, dtype=dtype)
 
 
         block_res_samples = dual_condition_model(
@@ -143,7 +149,9 @@ def denoise_lucidflux(
             y=vec_in,
             timesteps=t_vec,
             guidance=guidance_vec,
-            block_controlnet_hidden_states=[i for i in block_res_samples]
+            block_controlnet_hidden_states=[i for i in block_res_samples],
+            image_proj=image_proj_in,
+            ip_scale=ip_scale,
         )
 
         img = img + (t_prev - t_curr) * pred
